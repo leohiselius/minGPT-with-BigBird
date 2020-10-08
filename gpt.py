@@ -4,7 +4,7 @@ from torch.nn import *
 
 #process data
 
-#build model
+#build model haha
 
 class GPT(Module):
     def __init__(self):
