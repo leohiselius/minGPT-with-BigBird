@@ -35,10 +35,6 @@ class MultiHeadSelfAttention(Module):
         self.register_buffer("mask", torch.tril(torch.ones(config.block_size, config.block_size))
                                      .view(1, 1, config.block_size, config.block_size))
 
-        # TO-DO: i minGPT äter Dropout() något från conf, vad?
-        self.attention_drop = Dropout()
-        self.residual_drop = Dropout()
-
         # mask Q @ K.T
         if bigBird:
             n_neighbours = 5
@@ -84,13 +80,10 @@ class MultiHeadSelfAttention(Module):
 
         attention_mat = attention_mat.masked_fill(self.mask[:,:,:self.n_words,:self.n_words] == 0, float('-inf'))
         attention_mat = functional.softmax(attention_mat, dim=-1)
-        attention_mat = self.attention_drop(attention_mat)
 
         Z = attention_mat @ V # Z: [n_data, n_heads, n_words, n_latent]
 
         Z = Z.transpose(1,2).contiguous().view(self.n_data,self.n_words,self.n_latent*self.n_heads)
-
-        Z = self.residual_drop(self.W0(Z))
 
         return Z
 
