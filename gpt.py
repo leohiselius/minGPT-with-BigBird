@@ -12,7 +12,7 @@ class GPT(Module):
 
 class MultiHeadSelfAttention(Module):
 
-    def __init__(self, n_embd = 784, n_heads = 12, n_latent = 64, bigBird = False):
+    def __init__(self, n_embd = 784, n_heads = 12, big_bird = False):
         super().__init__()                       # ???
 
         self.n_embd = n_embd
@@ -20,31 +20,43 @@ class MultiHeadSelfAttention(Module):
         self.n_latent = n_embd // n_heads
 
         assert (n_embd / n_heads == self.n_latent), \
-            "n_heads must equally divide n_embd!" +
+            "n_heads must equally divide n_embd!"
 
         self.n_words = None  # number of words in sentence
         self.n_data = None  # number of sentences / data matrices in X tensor
 
-        self.W_k = Linear(n_latent*n_heads, n_embd)     #torch applies the transpose of Linear ( W_k(x) = x @ W_k.T )
-        self.W_q = Linear(n_latent*n_heads, n_embd)
-        self.W_v = Linear(n_latent*n_heads, n_embd)
+        self.W_k = Linear(self.n_latent*n_heads, n_embd) # torch applies the transpose of Linear ( W_k(x) = x @ W_k.T )
+        self.W_q = Linear(self.n_latent*n_heads, n_embd)
+        self.W_v = Linear(self.n_latent*n_heads, n_embd)
 
-        self.W0 = Linear(n_latent, n_latent*n_heads)          #output projection (combines the 12 heads into 1)
+        self.W0 = Linear(self.n_latent, self.n_latent*n_heads) # output projection (combines the 12 heads into 1)
 
-        # TO-DO: config.block_size ska bytas ut, en BigBird-variant ska skrivas
-        self.register_buffer("mask", torch.tril(torch.ones(config.block_size, config.block_size))
-                                     .view(1, 1, config.block_size, config.block_size))
+        # mask Q @ K.T. Mask should not be trained by optimizer and should thus be a buffer
 
-        # mask Q @ K.T
-        if bigBird:
+        # TODO : koda klart kontruktionen av np-matrisen, kolla om sparse hjälper i autograd
+        # TODO : undersök om vi kan implementera BigBirds roll block - lösning inom autograd
+        if big_bird:
+
+            # construct mask with numpy
             n_neighbours = 5
             n_memory = 2
-            mask = np.zeros((n_embd, n_embd), dtype=bool)
+            np_mask = np.zeros((n_embd, n_embd), dtype=bool)
             for i in range(-n_neighbours, n_neighbours + 1):
-                mask += np.diag(n_embd, k=i)
+                np_mask += np.diag(n_embd, k=i)
+
+            # convert to 4D tensor
+            tensor_mask = torch.tril(torch.from_numpy(np_mask)).view(1, 1, self.n_embd, self.n_embd)
+
+            # convert to sparse
+            non_zero_idx = torch.nonzero(tensor_mask).t() #t is transpose function
+            non_zero_values = tensor_mask[non_zero_idx[0],non_zero_idx[1]] # extract non zero values
+            mask = torch.sparse.FloatTensor(non_zero_idx,non_zero_values, tensor_mask.size())
+
         else:
-            mask = np.tril(np.ones(n_embd, n_embd))
-            mask.astype(bool)
+            # define upper triangular matrix stored as 4D tensor for compatibility
+            mask = torch.tril(torch.ones(self.n_embd, self.n_embd)).view(1, 1, self.n_embd, self.n_embd)
+
+        self.register_buffer("mask", mask)
 
     def forward(self, X):
         # pytorch linear treats final dim of data as input dim, other dims preserved
