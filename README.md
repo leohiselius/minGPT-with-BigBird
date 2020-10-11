@@ -9,3 +9,4 @@ This project strives to combine two models:
 
 [Maybe useful example of autograd on sparse matrices in comments](https://discuss.pytorch.org/t/manually-calculate-the-gradient-of-a-sparse-matrix/86203/3)
 
+[Video on BigBird, timestamp on block/roll implementation of sparse attention](https://youtu.be/WVPE62Gk3EM?t=1553)
